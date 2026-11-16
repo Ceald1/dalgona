@@ -18,3 +18,9 @@ go get k8s.io/client-go@latest k8s.io/api@latest k8s.io/apimachinery@latest
 3. repeat
 
 
+
+### Networking
+* use host networking for daemonsets so that wireguard is usable by bpfs
+#### Resources
+* https://github.com/cilium/cilium/tree/main/pkg/wireguard
+

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/informers"
@@ -14,7 +14,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 )
 
 func NewClient() (client *kubernetes.Clientset, err error) {
@@ -54,4 +53,32 @@ func NewPodInformer(client *kubernetes.Clientset, period time.Duration) cache.Sh
 
 	informer := factory.Core().V1().Pods().Informer()
 	return informer // just care about pods
+}
+
+type IPsAndServices map[string]string
+
+// per node function, spits out IPsAndServices type (string map of strings)
+func GetIPs(client *kubernetes.Clientset) (results IPsAndServices, err error) {
+	filter := fields.OneTermEqualSelector("spec.nodeName", os.Getenv("NODE_NAME")).String()
+	pods, err := client.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{
+		FieldSelector: filter,
+	})
+	if err != nil {
+		return
+	}
+	results = make(IPsAndServices)
+	for _, pod := range pods.Items {
+		ip := pod.Status.PodIP
+		results[fmt.Sprintf("%s.%s.cluster.local", strings.ReplaceAll(ip, ".", "-"), pod.Namespace)] = ip
+	}
+	services, err := client.CoreV1().Services("").List(context.Background(), metav1.ListOptions{
+		FieldSelector: filter,
+	})
+	if err != nil {
+		return
+	}
+	for _, service := range services.Items {
+		results[fmt.Sprintf("%s.%s.cluster.local", strings.ReplaceAll(service.Name, "_", "-"), service.Namespace)] = service.Spec.ClusterIP
+	}
+	return results, nil
 }

@@ -1,3 +1,4 @@
+// go:build ignore
 #include "network.h"
 
 static __always_inline bool is_ip_in_cidr(__be32 ip, __be32 net, __be32 mask) {

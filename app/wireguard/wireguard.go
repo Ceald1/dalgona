@@ -76,3 +76,9 @@ func NewClient(conf Conf) (c *wgctrl.Client, err error) {
 	err = c.ConfigureDevice("dalgona_wg0", wg_cfg)
 	return
 }
+
+func ImportKey(key []byte) (importedKey wgtypes.Key, err error) {
+	importedKey, err = wgtypes.ParseKey(string(key))
+
+	return
+}

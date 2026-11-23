@@ -7,6 +7,8 @@ WORKDIR /app
 
 COPY . .
 
+COPY ../bpf /bpf
+
 RUN go mod download
 
 RUN bash gen.sh

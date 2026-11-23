@@ -80,7 +80,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: ./app
+          context: ./
           file: ./app/Dockerfile
           push: true
           # Tags the image with 'latest' and lowercase repository name

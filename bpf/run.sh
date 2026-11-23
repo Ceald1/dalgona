@@ -1,6 +1,6 @@
 #!/bin/bash
 
-make
+cd /work
 
 
 # Ensure tracefs is mounted inside the container

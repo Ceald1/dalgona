@@ -24,9 +24,7 @@ WORKDIR /work
 
 COPY . .
 
-
-
-RUN cd /work && make
+RUN make
 
 CMD ["/bin/bash", "run.sh"]
 

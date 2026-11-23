@@ -1,5 +1,17 @@
 FROM golang:1.27.3-trixie
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        clang \
+        llvm \
+        libelf-dev \
+        libbpf-dev \
+        build-essential \
+        make \
+        sudo && \
+    rm -rf /var/lib/apt/lists/*
+
+
 WORKDIR /app
 
 # COPY go.mod go.sum ./

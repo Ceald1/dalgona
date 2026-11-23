@@ -6,7 +6,7 @@ import (
 
 	log "charm.land/log/v2"
 	network_bpf "github.com/Ceald1/dalgona/app/bpf/network"
-	dK8s "github.com/Ceald1/dalgona/app/k8s"
+	dK8s "github.com/Ceald1/dalgona/app/k8s_d"
 	wireguard "github.com/Ceald1/dalgona/app/wireguard"
 	K "k8s.io/client-go/kubernetes"
 )

@@ -26,7 +26,7 @@ COPY . .
 
 
 
-RUN make
+RUN cd /work && make
 
 CMD ["/bin/bash", "run.sh"]
 

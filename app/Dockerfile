@@ -9,6 +9,8 @@ COPY . .
 
 RUN go mod download
 
+RUN bash gen.sh
+
 RUN go build -a -o app .
 
 

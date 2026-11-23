@@ -25,8 +25,8 @@ RUN go mod download
 
 RUN bash gen.sh
 
-RUN cd /app && go build -a -o app .
+RUN go build -a -o app .
 
 
 
-CMD ["cd /app", "&&", "./app"]
+CMD ["./app"]

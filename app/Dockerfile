@@ -5,9 +5,9 @@ WORKDIR /app
 # COPY go.mod go.sum ./
 # RUN go mod download
 
-COPY . .
+COPY ./app /app
 
-COPY ../bpf /bpf
+COPY ./bpf /bpf
 
 RUN go mod download
 

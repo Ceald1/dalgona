@@ -17,9 +17,10 @@ COPY . .
 RUN make
 
 # ---- stage 3: runtime ----
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends make libelf1 zlib1g && \
+    apt-get install -y --no-install-recommends \
+        make libelf1 zlib1g libssl3 && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=bpftool-provider /usr/bin/bpftool /usr/local/bin/bpftool

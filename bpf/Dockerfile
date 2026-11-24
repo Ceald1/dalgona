@@ -19,15 +19,13 @@ RUN make
 # ---- stage 3: runtime ----
 FROM debian:bookworm-slim
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libelf1 zlib1g && \
+    apt-get install -y --no-install-recommends make libelf1 zlib1g && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=bpftool-provider /usr/bin/bpftool /usr/local/bin/bpftool
 
 WORKDIR /work
-# adjust to whatever `make` actually outputs
-COPY --from=build /work/*.o /work/
-COPY --from=build /work/run.sh /work/run.sh
+COPY --from=build /work /work
 
 CMD ["/bin/bash", "run.sh"]
 

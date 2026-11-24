@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: dalgona-svc
-  namespace: octagon-system
+  namespace: dalgona-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -20,7 +20,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: dalgona-svc
-    namespace: octagon-system
+    namespace: dalgona-system
 roleRef:
   kind: ClusterRole
   name: dalgona-role
@@ -32,7 +32,7 @@ metadata:
   labels:
     app: dalgona-app
   name: dalgona-app
-  namespace: octagon-system
+  namespace: dalgona-system
 spec:
   selector:
     matchLabels:
@@ -70,6 +70,7 @@ spec:
       hostNetwork: true # needed for wireguard
       containers:
         - image: ghcr.io/ceald1/dalgona-app:latest
+          imagePullPolicy: Always
           securityContext:
             privileged: true
           resources:

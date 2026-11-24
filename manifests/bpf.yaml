@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: dalgona-bpf
-  namespace: octagon-system
+  namespace: dalgona-system
   labels:
     app: dalgona-bpf
 spec:

@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dalgona-bpf
+  namespace: octagon-system
+  labels:
+    app: dalgona-bpf
+spec:
+  selector:
+    matchLabels:
+      app: dalgona-bpf
+  template:
+    metadata:
+      labels:
+        app: dalgona-bpf
+    spec:
+      hostPID: true
+      containers:
+        - name: dalgona-bpf
+          image: ghcr.io/ceald1/dalgona-bpf:latest
+          securityContext:
+            privileged: true
+          #          resources:
+          #            requests:
+          #              cpu: "200m"
+          #              memory: "500Mi"
+          #            limits:
+          #              cpu: "1000m"
+          #              memory: "1Gi"
+          volumeMounts:
+            - name: sys-fs-bpf
+              mountPath: /sys/fs/bpf
+              mountPropagation: HostToContainer
+            - name: sys-kernel-tracing
+              mountPath: /sys/kernel/tracing
+            - name: sys-kernel-debug
+              mountPath: /sys/kernel/debug
+      volumes:
+        - name: sys-fs-bpf
+          hostPath:
+            path: /sys/fs/bpf
+            type: DirectoryOrCreate
+
+        - name: sys-kernel-tracing
+          hostPath:
+            path: /sys/kernel/tracing
+            type: DirectoryOrCreate
+        - name: sys-kernel-debug
+          hostPath:
+            path: /sys/kernel/debug
+            type: DirectoryOrCreate

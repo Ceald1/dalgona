@@ -2,63 +2,72 @@ package main
 
 //go:generate mkdir -p bpf
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
+	rand "math/rand/v2"
 	"net/netip"
+	"os"
 	"os/signal"
+	"strconv"
+	"sync"
 	"syscall"
 	"time"
-
-	"sync"
-
-	"context"
 
 	log "charm.land/log/v2"
 	network_bpf "github.com/Ceald1/dalgona/app/bpf/network"
 	dK8s "github.com/Ceald1/dalgona/app/k8s_d"
 	wireguard "github.com/Ceald1/dalgona/app/wireguard"
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/rlimit"
+	"golang.zx2c4.com/wireguard/wgctrl"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	K "k8s.io/client-go/kubernetes"
 )
 
-// reread keys from secrets
-func ReloadKeys(client *K.Clientset, wgClient wireguard.Conf) wireguard.Conf {
-	time.Sleep(1 * time.Second)
-	keys, err := dK8s.GetPeers(client)
+// ReloadKeys re-reads peers from the k8s secret into conf (mutex-protected).
+func ReloadKeys(client *K.Clientset, conf *wireguard.Conf, mu *sync.Mutex, wg_cfg *wgctrl.Client) {
+	peers, err := dK8s.GetPeers(client)
 	if err != nil {
 		log.Warn(err.Error())
-		return wgClient
+		return
 	}
-	wgClient.Peers = keys
-
-	return wgClient
-
+	mu.Lock()
+	conf.Peers = peers
+	mu.Unlock()
+	cfg, err := wireguard.NewClient(*conf)
+	if err != nil {
+		log.Fatal(err)
+	}
+	wg_cfg = cfg
 }
 
-// update the bpf map initially and then watch for changes
-func GetPodIPs(client *K.Clientset, bpfHandle *network_bpf.NetworkObjects) {
+// GetPodIPs syncs the pod IP map into BPF until ctx is cancelled.
+func GetPodIPs(ctx context.Context, client *K.Clientset, bpfHandle *network_bpf.NetworkMaps) {
 	ips, err := dK8s.GetIPs(client)
 	if err != nil {
 		log.Warn(err.Error())
 	}
+	if ips == nil {
+		ips = make(map[string]string) // adjust type to match what GetIPs returns
+	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	// 1. Declare a named mutex so both the watcher and your loop share the exact same lock
 	var mu sync.RWMutex
 
-	// 2. Run the blocking foreground watcher in a background goroutine
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
+
 	go func() {
 		if err := dK8s.WatchIPs(client, &ips, &mu); err != nil {
 			log.Warn(err)
-			stop() // Cancel ctx if the watcher crashes so the foreground loop exits too
+			stop()
 		}
 	}()
 
-	// 3. Run your "while" loop in the foreground until Ctrl+C / SIGTERM (or watcher error)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+
+	prev := map[uint32]struct{}{}
 
 	for {
 		select {
@@ -67,63 +76,57 @@ func GetPodIPs(client *K.Clientset, bpfHandle *network_bpf.NetworkObjects) {
 			return
 
 		case <-ticker.C:
-			// Safely read from the shared ips map while WatchIPs updates it
 			mu.RLock()
 			keys := make([]uint32, 0, len(ips))
 			values := make([]network_bpf.NetworkStrKey, 0, len(ips))
+			current := make(map[uint32]struct{}, len(ips))
 
-			for k, v := range ips { // key is service, value is ip
-				ip, err := ipv4ToBe32(v)
+			for name, ipStr := range ips { // key is service, value is ip
+				ip, err := ipv4ToBe32(ipStr)
 				if err != nil {
 					log.Warn(err.Error())
 					continue
 				}
 
 				var value network_bpf.NetworkStrKey
-				maxCopy := len(k)
+				maxCopy := len(name)
 				if maxCopy >= len(value.Name) {
-					maxCopy = len(value.Name) - 1 // keep at least one trailing 0 if C reads a NUL-terminated string
-					log.Warnf("service name %q truncated to %d bytes", k, maxCopy)
+					maxCopy = len(value.Name) - 1
+					log.Warnf("service name %q truncated to %d bytes", name, maxCopy)
 				}
 				for i := 0; i < maxCopy; i++ {
-					value.Name[i] = int8(k[i])
+					value.Name[i] = int8(name[i])
 				}
 
 				keys = append(keys, ip)
 				values = append(values, value)
+				current[ip] = struct{}{}
 			}
+			mu.RUnlock()
 
 			if len(keys) > 0 {
-				_, err := bpfHandle.IpsMap.BatchUpdate(keys, values, &ebpf.BatchOptions{
+				if _, err := bpfHandle.IpsMap.BatchUpdate(keys, values, &ebpf.BatchOptions{
 					Flags: uint64(ebpf.UpdateAny),
-				})
-				if err != nil {
+				}); err != nil {
 					log.Warn(err)
 				}
 			}
-			// Example: iterate over ips or copy them for processing
-			//for k, v := range ips { // key is service, value is ip
-			//	var value network_bpf.NetworkStrKey
-			//	for i := 0; i < len(k); i++ {
-			//		value.Name[i] = int8(k[i])
-			//	}
-			//	ip, err := ipv4ToBe32(v)
-			//	if err != nil {
-			//		log.Warn(err.Error())
-			//		continue
-			//	}
 
-			//	err = bpfHandle.IpsMap.Update(ip, value, ebpf.UpdateAny)
-			//	if err != nil {
-			//		log.Warn(err)
-			//	}
-			//	//log.Infof("Current IP entry: %s -> %v", k, v)
-			//}
-			mu.RUnlock()
+			// remove entries that no longer exist
+			for k := range prev {
+				if _, ok := current[k]; !ok {
+					if err := bpfHandle.IpsMap.Delete(k); err != nil {
+						log.Warn(err)
+					}
+				}
+			}
+			prev = current
 		}
 	}
 }
 
+// ipv4ToBe32 returns a uint32 whose in-memory bytes are in network order,
+// which is what a __be32 key in the BPF map expects.
 func ipv4ToBe32(ipStr string) (uint32, error) {
 	addr, err := netip.ParseAddr(ipStr)
 	if err != nil {
@@ -132,11 +135,72 @@ func ipv4ToBe32(ipStr string) (uint32, error) {
 	if !addr.Is4() {
 		return 0, fmt.Errorf("not an IPv4 address: %q", ipStr)
 	}
+	ip4 := addr.As4()
+	return binary.NativeEndian.Uint32(ip4[:]), nil
+}
 
-	ip4 := addr.As4() // [byte0, byte1, byte2, byte3] in network/big-endian order
-	return binary.BigEndian.Uint32(ip4[:]), nil
+func startPeriodicTask(ctx context.Context, interval time.Duration, client *K.Clientset, conf *wireguard.Conf, mu *sync.Mutex, cfg *wgctrl.Client) {
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				ReloadKeys(client, conf, mu, cfg)
+			}
+		}
+	}()
 }
 
 func main() {
-	log.Info("Hello world, main code will be built here")
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	var conf wireguard.Conf
+	privkey, err := wgtypes.GeneratePrivateKey()
+	if err != nil {
+		log.Fatal(err)
+	}
+	k8sClient, err := dK8s.NewClient()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := dK8s.UpdateSecret(k8sClient, nil, &privkey); err != nil {
+		log.Fatal(err)
+	}
+	time.Sleep(time.Duration(rand.IntN(30)) * time.Second)
+
+	port, err := strconv.Atoi(os.Getenv("WG_PORT"))
+	if err != nil {
+		port = 51820 // default; err is intentionally not fatal
+	}
+	conf.Port = port
+	conf.PrivateKey = privkey
+
+	conf.Peers, err = dK8s.GetPeers(k8sClient)
+	if err != nil {
+		log.Fatal(err)
+	}
+	wgClient, err := wireguard.NewClient(conf)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer wgClient.Close()
+
+	var confMu sync.Mutex
+	startPeriodicTask(ctx, 2*time.Second, k8sClient, &conf, &confMu, wgClient)
+
+	// load the BPF objects so IpsMap actually exists
+	if err := rlimit.RemoveMemlock(); err != nil {
+		log.Fatal(err)
+	}
+	var objs network_bpf.NetworkObjects
+	if err := network_bpf.LoadNetworkObjects(&objs, nil); err != nil {
+		log.Fatal(err)
+	}
+	defer objs.Close()
+
+	GetPodIPs(ctx, k8sClient, &objs.NetworkMaps)
 }

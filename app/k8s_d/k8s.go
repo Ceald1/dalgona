@@ -11,6 +11,7 @@ import (
 	"time"
 
 	wg "github.com/Ceald1/dalgona/app/wireguard"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -179,13 +180,21 @@ func WatchIPs(client *kubernetes.Clientset, ips *IPsAndServices, mu *sync.RWMute
 }
 
 // update secret for node's public key, run after 5 minutes and have nodes ONLY update their key and no others
-func UpdateSecret(client *kubernetes.Clientset, cfg wg.Conf) (err error) {
+func UpdateSecret(client *kubernetes.Clientset, cfg *wg.Conf, privkey *wgtypes.Key) (err error) {
 	SecretName := fmt.Sprintf("%s-%s", SecretNameBase, os.Getenv("NODE_NAME"))
 	secret, err := client.CoreV1().Secrets(NS).Get(context.Background(), SecretName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	secret.Data["pubKey"] = []byte(cfg.PrivateKey.PublicKey().String())
+	if cfg != nil {
+		secret.Data["pubKey"] = []byte(cfg.PrivateKey.PublicKey().String())
+	} else {
+		if privkey != nil {
+			secret.Data["pubKey"] = []byte(privkey.PublicKey().String())
+		} else {
+			return fmt.Errorf("no key found")
+		}
+	}
 	_, err = client.CoreV1().Secrets(NS).Update(context.Background(), secret, metav1.UpdateOptions{})
 
 	return err

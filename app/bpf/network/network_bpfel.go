@@ -13,7 +13,7 @@ import (
 	"github.com/cilium/ebpf"
 )
 
-type networkStrKey struct {
+type NetworkStrKey struct {
 	_    structs.HostLayout
 	Name [256]int8
 }
@@ -22,39 +22,39 @@ type networkStrKey struct {
 //
 // Used for safe lookups in a Collection or CollectionSpec.
 const (
-	networkMapIpsMap    = "ips_map"
-	networkMapNetInfo   = "net_info"
-	networkMapWgInfo    = "wg_info"
-	networkProgToWg     = "to_wg"
-	networkVarMASK      = "MASK"
-	networkVarNET       = "NET"
-	networkVarWGI       = "WGI"
-	networkVarPidFilter = "pid_filter"
-	networkVarStrKey    = "str_key"
+	NetworkMapIpsMap    = "ips_map"
+	NetworkMapNetInfo   = "net_info"
+	NetworkMapWgInfo    = "wg_info"
+	NetworkProgToWg     = "to_wg"
+	NetworkVarMASK      = "MASK"
+	NetworkVarNET       = "NET"
+	NetworkVarWGI       = "WGI"
+	NetworkVarPidFilter = "pid_filter"
+	NetworkVarStrKey    = "str_key"
 )
 
-// loadNetwork returns the embedded CollectionSpec for network.
-func loadNetwork() (*ebpf.CollectionSpec, error) {
+// LoadNetwork returns the embedded CollectionSpec for Network.
+func LoadNetwork() (*ebpf.CollectionSpec, error) {
 	reader := bytes.NewReader(_NetworkBytes)
 	spec, err := ebpf.LoadCollectionSpecFromReader(reader)
 	if err != nil {
-		return nil, fmt.Errorf("can't load network: %w", err)
+		return nil, fmt.Errorf("can't load Network: %w", err)
 	}
 
 	return spec, err
 }
 
-// loadNetworkObjects loads network and converts it into a struct.
+// LoadNetworkObjects loads Network and converts it into a struct.
 //
 // The following types are suitable as obj argument:
 //
-//	*networkObjects
-//	*networkPrograms
-//	*networkMaps
+//	*NetworkObjects
+//	*NetworkPrograms
+//	*NetworkMaps
 //
 // See ebpf.CollectionSpec.LoadAndAssign documentation for details.
-func loadNetworkObjects(obj any, opts *ebpf.CollectionOptions) error {
-	spec, err := loadNetwork()
+func LoadNetworkObjects(obj any, opts *ebpf.CollectionOptions) error {
+	spec, err := LoadNetwork()
 	if err != nil {
 		return err
 	}
@@ -62,35 +62,35 @@ func loadNetworkObjects(obj any, opts *ebpf.CollectionOptions) error {
 	return spec.LoadAndAssign(obj, opts)
 }
 
-// networkSpecs contains maps and programs before they are loaded into the kernel.
+// NetworkSpecs contains maps and programs before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
-type networkSpecs struct {
-	networkProgramSpecs
-	networkMapSpecs
-	networkVariableSpecs
+type NetworkSpecs struct {
+	NetworkProgramSpecs
+	NetworkMapSpecs
+	NetworkVariableSpecs
 }
 
-// networkProgramSpecs contains programs before they are loaded into the kernel.
+// NetworkProgramSpecs contains programs before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
-type networkProgramSpecs struct {
+type NetworkProgramSpecs struct {
 	ToWg *ebpf.ProgramSpec `ebpf:"to_wg"`
 }
 
-// networkMapSpecs contains maps before they are loaded into the kernel.
+// NetworkMapSpecs contains maps before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
-type networkMapSpecs struct {
+type NetworkMapSpecs struct {
 	IpsMap  *ebpf.MapSpec `ebpf:"ips_map"`
 	NetInfo *ebpf.MapSpec `ebpf:"net_info"`
 	WgInfo  *ebpf.MapSpec `ebpf:"wg_info"`
 }
 
-// networkVariableSpecs contains global variables before they are loaded into the kernel.
+// NetworkVariableSpecs contains global variables before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
-type networkVariableSpecs struct {
+type NetworkVariableSpecs struct {
 	MASK      *ebpf.VariableSpec `ebpf:"MASK"`
 	NET       *ebpf.VariableSpec `ebpf:"NET"`
 	WGI       *ebpf.VariableSpec `ebpf:"WGI"`
@@ -98,32 +98,32 @@ type networkVariableSpecs struct {
 	StrKey    *ebpf.VariableSpec `ebpf:"str_key"`
 }
 
-// networkObjects contains all objects after they have been loaded into the kernel.
+// NetworkObjects contains all objects after they have been loaded into the kernel.
 //
-// It can be passed to loadNetworkObjects or ebpf.CollectionSpec.LoadAndAssign.
-type networkObjects struct {
-	networkPrograms
-	networkMaps
-	networkVariables
+// It can be passed to LoadNetworkObjects or ebpf.CollectionSpec.LoadAndAssign.
+type NetworkObjects struct {
+	NetworkPrograms
+	NetworkMaps
+	NetworkVariables
 }
 
-func (o *networkObjects) Close() error {
+func (o *NetworkObjects) Close() error {
 	return _NetworkClose(
-		&o.networkPrograms,
-		&o.networkMaps,
+		&o.NetworkPrograms,
+		&o.NetworkMaps,
 	)
 }
 
-// networkMaps contains all maps after they have been loaded into the kernel.
+// NetworkMaps contains all maps after they have been loaded into the kernel.
 //
-// It can be passed to loadNetworkObjects or ebpf.CollectionSpec.LoadAndAssign.
-type networkMaps struct {
+// It can be passed to LoadNetworkObjects or ebpf.CollectionSpec.LoadAndAssign.
+type NetworkMaps struct {
 	IpsMap  *ebpf.Map `ebpf:"ips_map"`
 	NetInfo *ebpf.Map `ebpf:"net_info"`
 	WgInfo  *ebpf.Map `ebpf:"wg_info"`
 }
 
-func (m *networkMaps) Close() error {
+func (m *NetworkMaps) Close() error {
 	return _NetworkClose(
 		m.IpsMap,
 		m.NetInfo,
@@ -131,10 +131,10 @@ func (m *networkMaps) Close() error {
 	)
 }
 
-// networkVariables contains all global variables after they have been loaded into the kernel.
+// NetworkVariables contains all global variables after they have been loaded into the kernel.
 //
-// It can be passed to loadNetworkObjects or ebpf.CollectionSpec.LoadAndAssign.
-type networkVariables struct {
+// It can be passed to LoadNetworkObjects or ebpf.CollectionSpec.LoadAndAssign.
+type NetworkVariables struct {
 	MASK      *ebpf.Variable `ebpf:"MASK"`
 	NET       *ebpf.Variable `ebpf:"NET"`
 	WGI       *ebpf.Variable `ebpf:"WGI"`
@@ -142,14 +142,14 @@ type networkVariables struct {
 	StrKey    *ebpf.Variable `ebpf:"str_key"`
 }
 
-// networkPrograms contains all programs after they have been loaded into the kernel.
+// NetworkPrograms contains all programs after they have been loaded into the kernel.
 //
-// It can be passed to loadNetworkObjects or ebpf.CollectionSpec.LoadAndAssign.
-type networkPrograms struct {
+// It can be passed to LoadNetworkObjects or ebpf.CollectionSpec.LoadAndAssign.
+type NetworkPrograms struct {
 	ToWg *ebpf.Program `ebpf:"to_wg"`
 }
 
-func (p *networkPrograms) Close() error {
+func (p *NetworkPrograms) Close() error {
 	return _NetworkClose(
 		p.ToWg,
 	)

@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	wg "github.com/Ceald1/dalgona/app/wireguard"
@@ -88,6 +89,93 @@ func GetIPs(client *kubernetes.Clientset) (results IPsAndServices, err error) {
 		results[fmt.Sprintf("%s.%s.cluster.local", strings.ReplaceAll(service.Name, "_", "-"), service.Namespace)] = service.Spec.ClusterIP
 	}
 	return results, nil
+}
+
+func WatchIPs(client *kubernetes.Clientset, ips *IPsAndServices, mu *sync.RWMutex) (err error) {
+	targetNode := os.Getenv("NODE_NAME")
+	factory := informers.NewSharedInformerFactoryWithOptions(client, 1*time.Second, informers.WithTweakListOptions(func(opts *metav1.ListOptions) {
+		opts.FieldSelector = fields.OneTermEqualSelector("spec.nodeName", targetNode).String()
+	}))
+	podInformer := factory.Core().V1().Pods().Informer()
+	svcInformer := factory.Core().V1().Services().Informer()
+	_, err = podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			pod, ok := obj.(*corev1.Pod)
+			if !ok || pod.Status.PodIP == "" {
+				return
+			}
+			mu.Lock()
+			(*ips)[pod.Name] = pod.Status.PodIP
+			mu.Unlock()
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			pod, ok := newObj.(*corev1.Pod)
+			if !ok || pod.Status.PodIP == "" {
+				return
+			}
+			oldPod, ok := newObj.(*corev1.Pod)
+			if !ok || oldPod.Status.PodIP == "" {
+				return
+			}
+			mu.Lock()
+			delete((*ips), oldPod.Name)
+			(*ips)[pod.Name] = pod.Status.PodIP
+			mu.Unlock()
+
+		},
+		DeleteFunc: func(obj interface{}) {
+			pod, ok := obj.(*corev1.Pod)
+			if !ok || pod.Status.PodIP == "" {
+				return
+			}
+			mu.Lock()
+			delete((*ips), pod.Name)
+			mu.Unlock()
+		},
+	})
+	if err != nil {
+		return err
+	}
+	_, err = svcInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			svc, ok := obj.(*corev1.Service)
+			if !ok || svc.Spec.ClusterIP == "" {
+				return
+			}
+			mu.Lock()
+			(*ips)[svc.Name] = svc.Spec.ClusterIP
+			mu.Unlock()
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			svc, ok := newObj.(*corev1.Service)
+			if !ok || svc.Spec.ClusterIP == "" {
+				return
+			}
+			oldsvc, ok := newObj.(*corev1.Service)
+			if !ok || oldsvc.Spec.ClusterIP == "" {
+				return
+			}
+			mu.Lock()
+			delete((*ips), oldsvc.Name)
+			(*ips)[svc.Name] = svc.Spec.ClusterIP
+			mu.Unlock()
+
+		},
+		DeleteFunc: func(obj interface{}) {
+			svc, ok := obj.(*corev1.Service)
+			if !ok || svc.Spec.ClusterIP == "" {
+				return
+			}
+			mu.Lock()
+			delete((*ips), svc.Name)
+			mu.Unlock()
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	return err
 }
 
 // update secret for node's public key, run after 5 minutes and have nodes ONLY update their key and no others

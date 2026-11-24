@@ -54,18 +54,18 @@ typedef unsigned int u32;
 typedef int pid_t;
 const pid_t pid_filter = 0;
 
-char LICENSE[] SEC("license") = "Dual BSD/GPL";
-#define WG_PORT 51820
-struct {
-  __uint(type, BPF_MAP_TYPE_ARRAY);
-  __type(key, __u32);
-  __type(value, __be32);
-  __uint(max_entries, 300000);
-} ips_map SEC(".maps");
-
 struct str_key {
   char name[MAX_LEN];
 } str_key;
+
+char LICENSE[] SEC("license") = "Dual BSD/GPL";
+#define WG_PORT 51820
+struct {
+  __uint(type, BPF_MAP_TYPE_HASH);
+  __type(key, __be32);
+  __type(value, str_key);
+  __uint(max_entries, 300000);
+} ips_map SEC(".maps");
 
 struct {
   __uint(type, BPF_MAP_TYPE_HASH);

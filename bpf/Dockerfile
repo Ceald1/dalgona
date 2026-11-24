@@ -2,7 +2,7 @@
 FROM ghcr.io/libbpf/bpftool:latest AS bpftool-provider
 
 # ---- stage 2: build ----
-FROM ubuntu:22.04 AS build
+FROM ubuntu:latest AS build
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
@@ -17,11 +17,13 @@ COPY . .
 RUN make
 
 # ---- stage 3: runtime ----
-FROM debian:trixie-slim
+FROM ubuntu:latest
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        make libelf1 zlib1g libssl3 && \
+        make libelf1 zlib1g libssl3 libllvm14 libzstd1 libcap2 && \
     rm -rf /var/lib/apt/lists/*
+
 
 COPY --from=bpftool-provider /usr/bin/bpftool /usr/local/bin/bpftool
 

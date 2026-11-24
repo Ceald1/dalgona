@@ -137,15 +137,6 @@ func ipv4ToBe32(ipStr string) (uint32, error) {
 	return binary.BigEndian.Uint32(ip4[:]), nil
 }
 
-//func GetPodIPs(client *K.Clientset) {
-//	ips, err := dK8s.GetIPs(client)
-//	if err != nil {
-//		log.Warn(err.Error())
-//	}
-//	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-//	defer stop()
-//	err = dK8s.WatchIPs(client, &ips, &sync.RWMutex{}, ctx)
-//	if err != nil {
-//		log.Warn(err)
-//	}
-//}
+func main() {
+	log.Info("Hello world, main code will be built here")
+}

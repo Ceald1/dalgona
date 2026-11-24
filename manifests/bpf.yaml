@@ -18,6 +18,7 @@ spec:
       containers:
         - name: dalgona-bpf
           image: ghcr.io/ceald1/dalgona-bpf:latest
+          imagePullPolicy: Always
           securityContext:
             privileged: true
           #          resources:

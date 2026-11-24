@@ -26,6 +26,30 @@ roleRef:
   name: dalgona-role
   apiGroup: rbac.authorization.k8s.io
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dalgona-role-secrets
+  namespace: dalgona-secrets
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "update", "create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dalgona-binding-secrets
+  namespace: dalgona-secrets
+subjects:
+  - kind: ServiceAccount
+    name: dalgona-svc
+    namespace: dalgona-system
+roleRef:
+  kind: Role
+  name: dalgona-role-secrets
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -56,7 +80,7 @@ spec:
             - sh
             - -c
             - |
-              TARGET_DIR="/sys/fs/bpf/dalgona"
+              TARGET_DIR="/sys/fs/bpf/dalgona/network"
 
               # Wait for directory to exist, then check if item count is > 1
               until [ -d "$TARGET_DIR" ] && [ $(ls -A "$TARGET_DIR" 2>/dev/null | wc -l) -gt 1 ]; do

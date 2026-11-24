@@ -196,6 +196,9 @@ func UpdateSecret(client *kubernetes.Clientset, cfg *wg.Conf, privkey *wgtypes.K
 		}
 	}
 	_, err = client.CoreV1().Secrets(NS).Update(context.Background(), secret, metav1.UpdateOptions{})
+	if strings.Contains("exist", err.Error()) {
+		_, err = client.CoreV1().Secrets(NS).Create(context.Background(), secret, metav1.CreateOptions{})
+	}
 
 	return err
 }

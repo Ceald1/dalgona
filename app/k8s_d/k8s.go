@@ -188,6 +188,7 @@ func UpdateSecret(client *kubernetes.Clientset, cfg *wg.Conf, privkey *wgtypes.K
 		secret.Name = SecretName
 
 		if cfg != nil {
+			secret = new(corev1.Secret)
 			secret.Data["pubKey"] = []byte(cfg.PrivateKey.PublicKey().String())
 		} else {
 			if privkey != nil {

@@ -37,7 +37,7 @@ func ReloadKeys(client *K.Clientset, conf *wireguard.Conf, mu *sync.Mutex, wg_cf
 	mu.Unlock()
 	cfg, err := wireguard.NewClient(*conf)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to create new config when reloading: %v", err)
 	}
 	wg_cfg = cfg
 }
@@ -59,7 +59,7 @@ func GetPodIPs(ctx context.Context, client *K.Clientset, bpfHandle *network_bpf.
 
 	go func() {
 		if err := dK8s.WatchIPs(client, &ips, &mu); err != nil {
-			log.Warn(err)
+			log.Warn("failed to watch for IPs %v", err)
 			stop()
 		}
 	}()
@@ -181,11 +181,11 @@ func main() {
 
 	conf.Peers, err = dK8s.GetPeers(k8sClient)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(fmt.Sprintf("failed to get peers: %v", err))
 	}
 	wgClient, err := wireguard.NewClient(conf)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(fmt.Sprintf("failed to make a new config: %s", err))
 	}
 	defer wgClient.Close()
 
@@ -194,11 +194,11 @@ func main() {
 
 	// load the BPF objects so IpsMap actually exists
 	if err := rlimit.RemoveMemlock(); err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to remove memory lock %v", err)
 	}
 	var objs network_bpf.NetworkObjects
 	if err := network_bpf.LoadNetworkObjects(&objs, nil); err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to load objects: %v", err)
 	}
 	defer objs.Close()
 

@@ -1,9 +1,12 @@
 package wireguard
 
 import (
+	"fmt"
+	"net"
+
+	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
-	"net"
 )
 
 type Conf struct {
@@ -18,6 +21,8 @@ type Peer struct {
 	Preshared  *wgtypes.Key
 	Endpoint   *net.UDPAddr //required!!
 }
+
+const ifaceName = "dalgona_wg0"
 
 // usage:
 // priv, _ := wgtypes.GeneratePrivateKey()
@@ -73,8 +78,26 @@ func NewClient(conf Conf) (c *wgctrl.Client, err error) {
 	foundPeerAddress:
 		continue
 	}
-	err = c.ConfigureDevice("dalgona_wg0", wg_cfg)
+	err = ensureInterface()
+	if err != nil {
+		return
+	}
+	err = c.ConfigureDevice(ifaceName, wg_cfg)
 	return
+}
+
+func ensureInterface() error {
+	if _, err := netlink.LinkByName(ifaceName); err == nil {
+		return nil // already exists
+	}
+	link := &netlink.GenericLink{
+		LinkAttrs: netlink.LinkAttrs{Name: ifaceName},
+		LinkType:  "wireguard",
+	}
+	if err := netlink.LinkAdd(link); err != nil {
+		return fmt.Errorf("create %s: %w", ifaceName, err)
+	}
+	return nil
 }
 
 func ImportKey(key []byte) (importedKey wgtypes.Key, err error) {

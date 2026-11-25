@@ -13,6 +13,7 @@ import (
 	wg "github.com/Ceald1/dalgona/app/wireguard"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/informers"
@@ -183,7 +184,7 @@ func WatchIPs(client *kubernetes.Clientset, ips *IPsAndServices, mu *sync.RWMute
 func UpdateSecret(client *kubernetes.Clientset, cfg *wg.Conf, privkey *wgtypes.Key) (err error) {
 	SecretName := fmt.Sprintf("%s-%s", SecretNameBase, os.Getenv("NODE_NAME"))
 	secret, err := client.CoreV1().Secrets(NS).Get(context.Background(), SecretName, metav1.GetOptions{})
-	if strings.Contains("exist", err.Error()) || strings.Contains("not found", err.Error()) {
+	if apierrors.IsNotFound(err) {
 		secret.Name = SecretName
 
 		if cfg != nil {

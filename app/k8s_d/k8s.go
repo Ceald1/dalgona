@@ -302,7 +302,7 @@ func GetPeers(client *kubernetes.Clientset) (peers []wg.Peer, err error) {
 			return nil, err
 		}
 
-		port, err := strconv.Atoi(os.Getenv("LISTEN_PORT"))
+		port, err := strconv.Atoi(os.Getenv("WG_PORT"))
 		if err != nil {
 			return nil, err
 		}

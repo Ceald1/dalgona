@@ -181,42 +181,84 @@ func WatchIPs(client *kubernetes.Clientset, ips *IPsAndServices, mu *sync.RWMute
 }
 
 // update secret for node's public key, run after 5 minutes and have nodes ONLY update their key and no others
-func UpdateSecret(client *kubernetes.Clientset, cfg *wg.Conf, privkey *wgtypes.Key) (err error) {
-	SecretName := fmt.Sprintf("%s-%s", SecretNameBase, os.Getenv("NODE_NAME"))
-	secret, err := client.CoreV1().Secrets(NS).Get(context.Background(), SecretName, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		secret.Name = SecretName
 
-		if cfg != nil {
-			secret = new(corev1.Secret)
-			secret.Data = make(map[string][]byte, 0)
-			secret.Data["pubKey"] = []byte(cfg.PrivateKey.PublicKey().String())
-		} else {
-			if privkey != nil {
-				secret.Data["pubKey"] = []byte(privkey.PublicKey().String())
-			} else {
-				return fmt.Errorf("no key found")
-			}
+func UpdateSecret(client *kubernetes.Clientset, cfg *wg.Conf, privkey *wgtypes.Key) error {
+	ctx := context.Background()
+	secretName := fmt.Sprintf("%s-%s", SecretNameBase, os.Getenv("NODE_NAME"))
+
+	// work out the public key once
+	var pubKey string
+	switch {
+	case cfg != nil:
+		pubKey = cfg.PrivateKey.PublicKey().String()
+	case privkey != nil:
+		pubKey = privkey.PublicKey().String()
+	default:
+		return fmt.Errorf("no key found")
+	}
+
+	secret, err := client.CoreV1().Secrets(NS).Get(ctx, secretName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		secret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: NS,
+			},
+			Data: map[string][]byte{
+				"pubKey": []byte(pubKey),
+			},
 		}
-		_, err = client.CoreV1().Secrets(NS).Create(context.Background(), secret, metav1.CreateOptions{})
+		_, err = client.CoreV1().Secrets(NS).Create(ctx, secret, metav1.CreateOptions{})
 		return err
 	}
 	if err != nil {
 		return err
 	}
-	if cfg != nil {
-		secret.Data["pubKey"] = []byte(cfg.PrivateKey.PublicKey().String())
-	} else {
-		if privkey != nil {
-			secret.Data["pubKey"] = []byte(privkey.PublicKey().String())
-		} else {
-			return fmt.Errorf("no key found")
-		}
-	}
-	_, err = client.CoreV1().Secrets(NS).Update(context.Background(), secret, metav1.UpdateOptions{})
 
+	if secret.Data == nil {
+		secret.Data = make(map[string][]byte)
+	}
+	secret.Data["pubKey"] = []byte(pubKey)
+	_, err = client.CoreV1().Secrets(NS).Update(ctx, secret, metav1.UpdateOptions{})
 	return err
 }
+
+//func UpdateSecret(client *kubernetes.Clientset, cfg *wg.Conf, privkey *wgtypes.Key) (err error) {
+//	SecretName := fmt.Sprintf("%s-%s", SecretNameBase, os.Getenv("NODE_NAME"))
+//	secret, err := client.CoreV1().Secrets(NS).Get(context.Background(), SecretName, metav1.GetOptions{})
+//	if apierrors.IsNotFound(err) {
+//		secret.Name = SecretName
+//
+//		if cfg != nil {
+//			secret = new(corev1.Secret)
+//			secret.Data = make(map[string][]byte, 0)
+//			secret.Data["pubKey"] = []byte(cfg.PrivateKey.PublicKey().String())
+//		} else {
+//			if privkey != nil {
+//				secret.Data["pubKey"] = []byte(privkey.PublicKey().String())
+//			} else {
+//				return fmt.Errorf("no key found")
+//			}
+//		}
+//		_, err = client.CoreV1().Secrets(NS).Create(context.Background(), secret, metav1.CreateOptions{})
+//		return err
+//	}
+//	if err != nil {
+//		return err
+//	}
+//	if cfg != nil {
+//		secret.Data["pubKey"] = []byte(cfg.PrivateKey.PublicKey().String())
+//	} else {
+//		if privkey != nil {
+//			secret.Data["pubKey"] = []byte(privkey.PublicKey().String())
+//		} else {
+//			return fmt.Errorf("no key found")
+//		}
+//	}
+//	_, err = client.CoreV1().Secrets(NS).Update(context.Background(), secret, metav1.UpdateOptions{})
+//
+//	return err
+//}
 
 func isNodeReady(node *corev1.Node) bool {
 	for _, condition := range node.Status.Conditions {

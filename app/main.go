@@ -46,7 +46,7 @@ func ReloadKeys(client *K.Clientset, conf *wireguard.Conf, mu *sync.Mutex, wg_cf
 func GetPodIPs(ctx context.Context, client *K.Clientset, bpfHandle *network_bpf.NetworkMaps) {
 	ips, err := dK8s.GetIPs(client)
 	if err != nil {
-		log.Warn(err.Error())
+		log.Warn(fmt.Sprintf("failed to get IPs: %v", err.Error()))
 	}
 	if ips == nil {
 		ips = make(map[string]string) // adjust type to match what GetIPs returns
@@ -108,7 +108,7 @@ func GetPodIPs(ctx context.Context, client *K.Clientset, bpfHandle *network_bpf.
 				if _, err := bpfHandle.IpsMap.BatchUpdate(keys, values, &ebpf.BatchOptions{
 					Flags: uint64(ebpf.UpdateAny),
 				}); err != nil {
-					log.Warn(err)
+					log.Warn(fmt.Sprintf("failed to update map in batch: %v", err))
 				}
 			}
 
@@ -116,7 +116,7 @@ func GetPodIPs(ctx context.Context, client *K.Clientset, bpfHandle *network_bpf.
 			for k := range prev {
 				if _, ok := current[k]; !ok {
 					if err := bpfHandle.IpsMap.Delete(k); err != nil {
-						log.Warn(err)
+						log.Warn("failed to remove entry: %v", err)
 					}
 				}
 			}

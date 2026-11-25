@@ -1,0 +1,44 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "debian/trixie64"
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  nodes = {
+    "k3s-server" => { ip: "192.168.122.10", mac: "52:54:00:aa:bb:10" },
+    "k3s-agent1" => { ip: "192.168.122.11", mac: "52:54:00:aa:bb:11" },
+    "k3s-agent2" => { ip: "192.168.122.12", mac: "52:54:00:aa:bb:12" },
+  }
+
+  nodes.each do |name, n|
+    config.vm.define name do |node|
+      node.vm.hostname = name
+      node.vm.provider "libvirt" do |lv|
+        lv.cpus   = 2
+        lv.memory = 4096
+        lv.management_network_mac = n[:mac]
+      end
+    end
+  end
+end
+
+#Vagrant.configure("2") do |config|
+#  config.vm.box = "debian/trixie64"   # Debian 13; verify the box exists, see notes
+#  config.vm.synced_folder ".", "/vagrant", disabled: true
+#
+#  nodes = {
+#    "k3s-server" => "192.168.122.10",
+#    "k3s-agent1" => "192.168.122.11",
+#    "k3s-agent2" => "192.168.122.12",
+#  }
+#
+#  nodes.each do |name, ip|
+#    config.vm.define name do |node|
+#      node.vm.hostname = name
+#      node.vm.network "private_network", ip: ip
+#
+#      node.vm.provider "libvirt" do |lv|
+#        lv.cpus   = 2
+#        lv.memory = 4096
+#      end
+#    end
+#  end
+#end

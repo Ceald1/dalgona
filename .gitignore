@@ -26,7 +26,7 @@
 # Fortran module files
 #*.mod
 *.smod
-
+.vagrant
 # Compiled Static libraries
 *.lai
 *.la

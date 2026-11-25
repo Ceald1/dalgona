@@ -183,7 +183,7 @@ func WatchIPs(client *kubernetes.Clientset, ips *IPsAndServices, mu *sync.RWMute
 func UpdateSecret(client *kubernetes.Clientset, cfg *wg.Conf, privkey *wgtypes.Key) (err error) {
 	SecretName := fmt.Sprintf("%s-%s", SecretNameBase, os.Getenv("NODE_NAME"))
 	secret, err := client.CoreV1().Secrets(NS).Get(context.Background(), SecretName, metav1.GetOptions{})
-	if strings.Contains("exist", err.Error()) {
+	if strings.Contains("exist", err.Error()) || strings.Contains("not found", err.Error()) {
 		secret.Name = SecretName
 
 		if cfg != nil {
